@@ -1,0 +1,24 @@
+Source: seq24
+Section: sound
+Priority: optional
+Maintainer: Debian QA Group <packages@qa.debian.org>
+Build-Depends: debhelper (>= 7),
+ automake,
+ autoconf,
+ autotools-dev (>= 20100122.1~),
+ libgtkmm-2.4-dev,
+ libasound2-dev [!kfreebsd-i386 !kfreebsd-amd64 !hurd-i386],
+ liblash-dev,
+ libjack-dev
+Standards-Version: 3.9.0
+Homepage: http://www.filter24.org/seq24/
+
+Package: seq24
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends}
+Description: Real time MIDI sequencer
+ Seq24 was created to provide a very simple interface for editing and 
+ playing midi 'loops'. It is a very minimal sequencer that excludes the 
+ bloated features of the large software sequencers and includes a small 
+ subset that proved to be useful for live performances.

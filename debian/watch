@@ -1,0 +1,2 @@
+version=2
+http://www.filter24.org/seq24/download.html seq24-(.*)\.tar\.gz
