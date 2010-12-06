@@ -1,3 +1,14 @@
+seq24 (0.9.0-3) unstable; urgency=low
+
+  * New maintainer (Closes: #547028), add myself to the Uploaders list.
+  * Add git-buildpackage config file.
+  * debian/patches/02-sched_param_memory_leaks.patch:
+    - Fix sched_param memory leaks, patch taken from upstream's bzr.
+  * debian/patches/01-gtkmm_2.19.patch:
+    - Applied upstream.
+
+ -- Alessio Treglia <alessio@debian.org>  Mon, 06 Dec 2010 18:48:14 +0100
+
 seq24 (0.9.0-2) unstable; urgency=low
 
   * QA upload.
