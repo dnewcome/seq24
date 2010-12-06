@@ -21,7 +21,7 @@
 #include <string>
 #include <sigc++/slot.h>
 #include <gtkmm.h>
-#include "config.h"
+
 #include "lash.h"
 #include "midifile.h"
 
@@ -29,10 +29,22 @@
 lash::lash(int *argc, char ***argv)
 {
 #ifdef LASH_SUPPORT
-    m_client = lash_init(lash_extract_args(argc, argv), PACKAGE_NAME,
-        LASH_Config_File, LASH_PROTOCOL(2, 0));
+   m_lash_args = lash_extract_args(argc, argv);
+#endif // LASH_SUPPORT
+}
+
+
+void lash::init(perform* perform)
+{
+#ifdef LASH_SUPPORT
+    m_perform = perform;
+
+    m_client = lash_init(m_lash_args, PACKAGE_NAME,
+            LASH_Config_File, LASH_PROTOCOL(2, 0));
+
     if (m_client == NULL) {
-        fprintf(stderr, "Failed to connect to LASH.  Session management will not occur.\n");
+        fprintf(stderr, "Failed to connect to LASH.  "
+                "Session management will not occur.\n");
     } else {
         lash_event_t* event = lash_event_new_with_type(LASH_Client_Name);
         lash_event_set_string(event, "Seq24");
@@ -47,17 +59,15 @@ void
 lash::set_alsa_client_id(int id)
 {
 #ifdef LASH_SUPPORT
-	lash_alsa_client_id(m_client, id);
+    lash_alsa_client_id(m_client, id);
 #endif
 }
 
 
 void
-lash::start(perform* perform)
+lash::start()
 {
 #ifdef LASH_SUPPORT
-	m_perform = perform;
-
     /* Process any LASH events every 250 msec (arbitrarily chosen interval) */
     Glib::signal_timeout().connect(sigc::mem_fun(*this, &lash::process_events), 250);
 #endif // LASH_SUPPORT
@@ -69,8 +79,7 @@ lash::start(perform* perform)
 bool
 lash::process_events()
 {
-    lash_event_t  *ev = NULL;
-    //lash_config_t *conf = NULL;
+    lash_event_t *ev = NULL;
 
     // Process events
     while ((ev = lash_get_event(m_client)) != NULL) {
@@ -101,8 +110,8 @@ lash::handle_event(lash_event_t* ev)
         m_client = NULL;
         Gtk::Main::quit();
     } else {
-		fprintf(stderr, "Warning:  Unhandled LASH event.\n");
-	}
+        fprintf(stderr, "Warning:  Unhandled LASH event.\n");
+    }
 }
 
 

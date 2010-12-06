@@ -18,24 +18,38 @@
 //
 //-----------------------------------------------------------------------------
 
-#ifndef SEQ24_USERFILE
-#define SEQ24_USERFILE
+// GTK text edit widget for getting keyboard button values (for binding keys)
+// put cursor in text box, hit a key, something like  'a' (42)  appears...
+// each keypress replaces the previous text.
+// also supports keyevent and keygroup maps in the perform class
 
-#include "perform.h"
-#include "configfile.h"
-#include <string>
+#ifndef SEQ24_KEYBINDENTRY
+#define SEQ24_KEYBINDENTRY
 
-class userfile  : public configfile
+#include <gtkmm/entry.h>
+
+
+/*forward declaration*/
+class perform;
+
+
+class KeyBindEntry : public Gtk::Entry
 {
 
- public:
+public:
+    enum type { location, events, groups };
 
-    userfile( string a_name );
-    ~userfile( );
+    KeyBindEntry(type t, unsigned int* location_to_write = NULL,
+            perform* p = NULL, long s = 0);
 
-    bool parse( perform *a_perf );
-    bool write( perform *a_perf );
+    void set( unsigned int val );
+    virtual bool on_key_press_event(GdkEventKey* event);
+
+private:
+    unsigned int* m_key;
+    type m_type;
+    perform* m_perf;
+    long m_slot;
 };
-
 
 #endif

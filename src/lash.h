@@ -21,7 +21,12 @@
 #ifndef SEQ24_LASH
 #define SEQ24_LASH
 
+#ifdef __WIN32__
+#include "configwin32.h"
+#else
 #include "config.h"
+#endif
+
 #include "perform.h"
 
 #ifdef LASH_SUPPORT
@@ -38,6 +43,7 @@ private:
 #ifdef LASH_SUPPORT
     perform       *m_perform;
     lash_client_t *m_client;
+    lash_args_t *m_lash_args;
 
     bool process_events();
     void handle_event(lash_event_t* conf);
@@ -48,8 +54,9 @@ private:
 public:
     lash(int *argc, char ***argv);
 
-	void set_alsa_client_id(int id);
-    void start(perform* perform);
+    void init(perform* perform);
+    void set_alsa_client_id(int id);
+    void start();
 };
 
 

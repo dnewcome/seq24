@@ -25,6 +25,7 @@
 #include <fstream>
 #include <string>
 #include <list>
+#include <vector>
 
 class midifile 
 {
@@ -32,25 +33,27 @@ class midifile
  private:
     
     int m_pos;
-    string m_name;
+    const std::string m_name;
 
     /* holds our data */
-    unsigned char *m_d;
+	std::vector<unsigned char> m_d;
     
     list<unsigned char> m_l;
 
     unsigned long read_long();
     unsigned short read_short();
+    unsigned char read_byte();
     unsigned long read_var();
 
     void write_long( unsigned long );
     void write_short( unsigned short );
+    void write_byte( unsigned char );
 
  public:
 
-    midifile( string a_name );
+    midifile(const Glib::ustring&);
  
-    ~midifile(  );
+    ~midifile();
 
     bool parse( perform *a_perf, int a_screen_set );
     bool write( perform *a_perf );
