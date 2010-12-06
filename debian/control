@@ -13,7 +13,7 @@ Build-Depends: debhelper (>= 7),
  libjack-dev (>= 1:0.118+svn4089-1~) | libjack-jackd2-dev (>= 1.9.6~dfsg.1-3~)
 Standards-Version: 3.9.1
 Homepage: http://www.filter24.org/seq24/
-Vcs-Git: git+ssh://git.debian.org/git/pkg-multimedia/seq24.git
+Vcs-Git: git://git.debian.org/pkg-multimedia/seq24.git
 Vcs-Browser: http://git.debian.org/?p=pkg-multimedia/seq24.git
 
 Package: seq24
