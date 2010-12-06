@@ -1,7 +1,8 @@
 Source: seq24
 Section: sound
 Priority: optional
-Maintainer: Debian QA Group <packages@qa.debian.org>
+Maintainer: Debian Multimedia Maintainers <pkg-multimedia-maintainers@lists.alioth.debian.org>
+Uploaders: Alessio Treglia <alessio@debian.org>
 Build-Depends: debhelper (>= 7),
  automake,
  autoconf,
@@ -12,6 +13,8 @@ Build-Depends: debhelper (>= 7),
  libjack-dev
 Standards-Version: 3.9.0
 Homepage: http://www.filter24.org/seq24/
+Vcs-Git: git+ssh://git.debian.org/git/pkg-multimedia/seq24.git
+Vcs-Browser: http://git.debian.org/?p=pkg-multimedia/seq24.git
 
 Package: seq24
 Architecture: any
