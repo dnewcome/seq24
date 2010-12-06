@@ -11,7 +11,7 @@ Build-Depends: debhelper (>= 7),
  libasound2-dev [!kfreebsd-i386 !kfreebsd-amd64 !hurd-i386],
  liblash-dev,
  libjack-dev
-Standards-Version: 3.9.0
+Standards-Version: 3.9.1
 Homepage: http://www.filter24.org/seq24/
 Vcs-Git: git+ssh://git.debian.org/git/pkg-multimedia/seq24.git
 Vcs-Browser: http://git.debian.org/?p=pkg-multimedia/seq24.git
