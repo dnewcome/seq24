@@ -27,18 +27,18 @@
 #include <string>
 #include <list>
 
-class optionsfile  : public configfile
+class optionsfile : public configfile
 {
 
  public:
 
-    optionsfile( string a_name );
+    optionsfile(const Glib::ustring& a_name);
     ~optionsfile( );
-    
+
     bool parse( perform *a_perf );
     bool write( perform *a_perf );
 
 };
 
 
-#endif 
+#endif

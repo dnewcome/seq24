@@ -34,7 +34,12 @@ const unsigned char  EVENT_PROGRAM_CHANGE   = 0xC0;
 const unsigned char  EVENT_CHANNEL_PRESSURE = 0xD0;
 const unsigned char  EVENT_PITCH_WHEEL      = 0xE0;
 const unsigned char  EVENT_CLEAR_CHAN_MASK  = 0xF0;
+const unsigned char  EVENT_MIDI_SONG_POS    = 0xF2;
 const unsigned char  EVENT_MIDI_CLOCK       = 0xF8;
+const unsigned char  EVENT_MIDI_START       = 0xFA;
+const unsigned char  EVENT_MIDI_CONTINUE    = 0xFB;
+const unsigned char  EVENT_MIDI_STOP        = 0xFC;
+
 const unsigned char  EVENT_SYSEX            = 0xF0;
 const unsigned char  EVENT_SYSEX_END        = 0xF7;
 
@@ -59,6 +64,9 @@ class event
     /* data for sysex */
     unsigned char *m_sysex;
 
+    /* size of sysex message */
+    long m_size;
+
     /* used to link note ons and offs together */
     event *m_linked;
     bool m_has_link;
@@ -71,16 +79,13 @@ class event
 
     /* is this event being painted */
     bool m_painted;
-    
-    /* size of sysex message */
-    long m_size;
 
     /* used in sorting */
     int get_rank( ) const;
 
  public:
 
-    event(); 
+    event();
     ~event();
 
     void set_timestamp( const unsigned long time );
@@ -139,7 +144,7 @@ class event
     void print();
 
     /* overloads */
- 
+
     bool operator> ( const event &rhsevent );
     bool operator< ( const event &rhsevent );
 

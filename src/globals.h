@@ -17,15 +17,23 @@
 //  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 //
 //-----------------------------------------------------------------------------
-#include "config.h"
-
 
 #ifndef SEQ24_GLOBALS
 #define SEQ24_GLOBALS
 
+#ifdef __WIN32__
+#    include "configwin32.h"
+#else
+#    include "config.h"
+#endif
+
 #include <string>
 #include <gtkmm/main.h>
 #include <gtkmm/drawingarea.h>
+//For keys
+#include <gtkmm/accelkey.h>
+
+
 
 using namespace std;
 
@@ -33,6 +41,7 @@ using namespace std;
 const int c_mainwnd_rows = 4;
 const int c_mainwnd_cols = 8;
 const int c_seqs_in_set = c_mainwnd_rows * c_mainwnd_cols;
+const int c_gmute_tracks = c_seqs_in_set * c_seqs_in_set;
 const int c_max_sets = 32;
 const int c_total_seqs = c_seqs_in_set * c_max_sets;
 
@@ -61,12 +70,12 @@ const int c_mainwid_spacing = 2;
 const int c_control_height = 0;
 
 
-const int c_mainwid_x = ((c_seqarea_x + c_mainwid_spacing ) 
+const int c_mainwid_x = ((c_seqarea_x + c_mainwid_spacing )
 			 * c_mainwnd_cols - c_mainwid_spacing
 			 +  c_mainwid_border * 2 );
-const int c_mainwid_y = ((c_seqarea_y  + c_mainwid_spacing ) 
+const int c_mainwid_y = ((c_seqarea_y  + c_mainwid_spacing )
 			 * c_mainwnd_rows
-			 +  c_mainwid_border * 2 
+			 +  c_mainwid_border * 2
 			 +  c_control_height );
 
 
@@ -98,7 +107,7 @@ const int c_timearea_y = 18;
 
 /* sequences */
 const int c_midi_notes = 256;
-const string c_dummy( "Untitled" );
+const std::string c_dummy( "Untitled" );
 
 /* maximum size of sequence, default size */
 const int c_maxbeats     = 0xFFFF;   /* max number of beats in a sequence */
@@ -114,6 +123,7 @@ const unsigned long c_timesig =    0x24240006;
 const unsigned long c_bpmtag =     0x24240007;
 const unsigned long c_triggers_new =   0x24240008;
 const unsigned long c_midictrl =   0x24240010;
+const unsigned long c_mutegroups = 0x24240009; // not sure why we went to 10 above, this might need a different value
 
 
 const char c_font_6_12[] = "-*-fixed-medium-r-*--12-*-*-*-*-*-*";
@@ -127,8 +137,11 @@ const int c_normal = 1;
 const int c_paste  = 2;
 
 /* redraw when recording ms */
+#ifdef __WIN32__
+const int c_redraw_ms = 20;
+#else
 const int c_redraw_ms = 40;
-
+#endif
 
 /* consts for perform editor */
 const int c_names_x = 6 * 24;
@@ -145,8 +158,9 @@ extern bool global_with_jack_master_cond;
 extern bool global_jack_start_mode;
 extern bool global_manual_alsa_ports;
 
-extern std::string global_filename;
-extern std::string last_used_dir;
+extern Glib::ustring global_filename;
+extern Glib::ustring global_jack_session_uuid;
+extern Glib::ustring last_used_dir;
 extern bool is_pattern_playing;
 
 extern bool global_print_keys;
@@ -180,7 +194,7 @@ enum c_music_scales {
 
 
 const bool c_scales_policy[c_scale_size][12] =
-  {
+{
     /* off = chromatic */
     { true,true,true,true,true,true,true,true,true,true,true,true},
 
@@ -190,10 +204,10 @@ const bool c_scales_policy[c_scale_size][12] =
     /* minor */
     { true,false,true,true,false,true,false,true,true,false,true,false},
 
-  };
+};
 
 const int c_scales_transpose_up[c_scale_size][12] =
-  {
+{
     /* off = chromatic */
     { 1,1,1,1,1,1,1,1,1,1,1,1},
     /* major */
@@ -201,13 +215,13 @@ const int c_scales_transpose_up[c_scale_size][12] =
     /* minor */
     { 2,0,1,2,0,2,0,1,2,0,2,0},
 
-  };
+};
 
 
 
 
 const int c_scales_transpose_dn[c_scale_size][12] =
-  {
+{
     /* off = chromatic */
     { -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},
     /* major */
@@ -215,40 +229,40 @@ const int c_scales_transpose_dn[c_scale_size][12] =
     /* minor */
     { -2,0,-2,-1,0,-2,0,-2,-1,0,-2,0},
 
-  };
+};
 
 const int c_scales_symbol[c_scale_size][12] =
-  {
+{
     /* off = chromatic */
     { 32,32,32,32,32,32,32,32,32,32,32,32},
 
     /* major */
     { 32,32,32,32,32,32,32,32,32,32,32,32},
-               
+
     /* minor */
     { 32,32,32,32,32,32,32,32,129,128,129,128},
-                 
-  };             
-                 
-// up 128        
+
+};
+
+// up 128
 // down 129
 
 
 const char c_scales_text[c_scale_size][6] =
-{ 
-    "Off", 
-    "Major", 
-    "Minor" 
+{
+    "Off",
+    "Major",
+    "Minor"
 };
 
 const char c_key_text[][3] =
 {
-    "C", 
-    "C#", 
-    "D", 
-    "D#", 
+    "C",
+    "C#",
+    "D",
+    "D#",
     "E",
-    "F", 
+    "F",
     "F#",
     "G",
     "G#",
@@ -289,12 +303,34 @@ const char c_chord_text[][5] =
     "VIII"
 };
 
-enum mouse_action_e 
+enum mouse_action_e
 {
     e_action_select,
     e_action_draw,
     e_action_grow
 };
 
+enum interaction_method_e
+{
+    e_seq24_interaction,
+    e_fruity_interaction,
+    e_number_of_interactions // keep this one last...
+};
+
+const char* const c_interaction_method_names[] =
+{
+    "seq24",
+    "fruity",
+    NULL
+};
+
+const char* const c_interaction_method_descs[] =
+{
+    "original seq24 method",
+    "similar to a certain fruity sequencer we like",
+    NULL
+};
+
+extern interaction_method_e global_interactionmethod;
 
 #endif

@@ -19,30 +19,49 @@
 //-----------------------------------------------------------------------------
 
 #include <cctype>
+#include <csignal>
+#include <cerrno>
+#include <cstring>
+#include <gtk/gtkversion.h>
 
 #include "mainwnd.h"
 #include "perform.h"
 #include "midifile.h"
 #include "perfedit.h"
 
-#include "play2.xpm"
-#include "stop.xpm"
-#include "perfedit.xpm"
-#include "seq24.xpm"
-#include "seq24_32.xpm"
+#include "pixmaps/play2.xpm"
+#include "pixmaps/stop.xpm"
+#include "pixmaps/learn.xpm"
+#include "pixmaps/learn2.xpm"
+#include "pixmaps/perfedit.xpm"
+#include "pixmaps/seq24.xpm"
+#include "pixmaps/seq24_32.xpm"
 
 bool is_pattern_playing = false;
 
-mainwnd::mainwnd(perform *a_p)
+// tooltip helper, for old vs new gtk...
+#if GTK_MINOR_VERSION >= 12
+#   define add_tooltip( obj, text ) obj->set_tooltip_text( text);
+#else
+#   define add_tooltip( obj, text ) m_tooltips->set_tip( *obj, text );
+#endif
+
+mainwnd::mainwnd(perform *a_p):
+    m_mainperf(a_p),
+    m_modified(false),
+    m_options(NULL)
 {
     set_icon(Gdk::Pixbuf::create_from_xpm_data(seq24_32_xpm));
 
-    /* set the performance */
-    m_mainperf = a_p;
+    /* register for notification */
+    m_mainperf->m_notify.push_back( this );
 
     /* main window */
     update_window_title();
 
+#if GTK_MINOR_VERSION < 12
+    m_tooltips = manage( new Tooltips() );
+#endif
     m_main_wid = manage( new mainwid( m_mainperf ));
     m_main_time = manage( new maintime( ));
 
@@ -50,13 +69,13 @@ mainwnd::mainwnd(perform *a_p)
 
     m_menu_file = manage(new Menu());
     m_menubar->items().push_front(MenuElem("_File", *m_menu_file));
-    
+
     m_menu_view = manage( new Menu());
     m_menubar->items().push_back(MenuElem("_View", *m_menu_view));
 
     m_menu_help = manage( new Menu());
     m_menubar->items().push_back(MenuElem("_Help", *m_menu_help));
-    
+
     /* file menu items */
     m_menu_file->items().push_back(MenuElem("_New",
                 Gtk::AccelKey("<control>N"),
@@ -83,23 +102,62 @@ mainwnd::mainwnd(perform *a_p)
     m_menu_view->items().push_back(MenuElem("_Song Editor...",
                 Gtk::AccelKey("<control>E"),
                 mem_fun(*this, &mainwnd::open_performance_edit)));
- 
+
     /* help menu items */
     m_menu_help->items().push_back(MenuElem("_About...",
                 mem_fun(*this, &mainwnd::about_dialog)));
- 
+
+    /* top line items */
+    HBox *tophbox = manage( new HBox( false, 0 ) );
+    tophbox->pack_start(*manage(new Image(
+                    Gdk::Pixbuf::create_from_xpm_data(seq24_xpm))),
+            false, false);
+
+    // adjust placement...
+    VBox *vbox_b = manage( new VBox() );
+    HBox *hbox3 = manage( new HBox( false, 0 ) );
+    vbox_b->pack_start( *hbox3, false, false );
+    tophbox->pack_end( *vbox_b, false, false );
+    hbox3->set_spacing( 10 );
+
+    /* timeline */
+    hbox3->pack_start( *m_main_time, false, false );
+
+    /* group learn button */
+    m_button_learn = manage( new Button( ));
+    m_button_learn->set_focus_on_click( false );
+    m_button_learn->set_flags( m_button_learn->get_flags() & ~Gtk::CAN_FOCUS );
+    m_button_learn->set_image(*manage(new Image(
+                    Gdk::Pixbuf::create_from_xpm_data( learn_xpm ))));
+    m_button_learn->signal_clicked().connect(
+            mem_fun(*this, &mainwnd::learn_toggle));
+    add_tooltip( m_button_learn, "Mute Group Learn\n\n"
+            "Click 'L' then press a mutegroup key to store the mute state of "
+            "the sequences in that key.\n\n"
+            "(see File/Options/Keyboard for available mutegroup keys "
+            "and the corresponding hotkey for the 'L' button)" );
+    hbox3->pack_end( *m_button_learn, false, false );
+
+    /*this seems to be a dirty hack:*/
+    Button w;
+    hbox3->set_focus_child( w ); // clear the focus not to trigger L via keys
+
 
     /* bottom line items */
-    HBox *hbox = manage( new HBox( false, 2 ) );
+    HBox *bottomhbox = manage( new HBox(false, 10));
+
+    /* container for start+stop buttons */
+    HBox *startstophbox = manage(new HBox(false, 4));
+    bottomhbox->pack_start(*startstophbox, Gtk::PACK_SHRINK);
 
     /* stop button */
-    m_button_stop = manage( new Button( ));
+    m_button_stop = manage( new Button());
     m_button_stop->add(*manage(new Image(
                     Gdk::Pixbuf::create_from_xpm_data( stop_xpm ))));
     m_button_stop->signal_clicked().connect(
             mem_fun(*this, &mainwnd::stop_playing));
-    m_button_stop->set_tooltip_text("Stop playing MIDI sequence");
-    hbox->pack_start(*m_button_stop, false, false);
+    add_tooltip( m_button_stop, "Stop playing MIDI sequence" );
+    startstophbox->pack_start(*m_button_stop, Gtk::PACK_SHRINK);
 
     /* play button */
     m_button_play = manage(new Button() );
@@ -107,8 +165,54 @@ mainwnd::mainwnd(perform *a_p)
                     Gdk::Pixbuf::create_from_xpm_data( play2_xpm ))));
     m_button_play->signal_clicked().connect(
             mem_fun( *this, &mainwnd::start_playing));
-    m_button_play->set_tooltip_text("Play MIDI sequence");
-    hbox->pack_start(*m_button_play, false, false);
+    add_tooltip( m_button_play, "Play MIDI sequence" );
+    startstophbox->pack_start(*m_button_play, Gtk::PACK_SHRINK);
+
+    /* bpm spin button with label*/
+    HBox *bpmhbox = manage(new HBox(false, 4));
+    bottomhbox->pack_start(*bpmhbox, Gtk::PACK_SHRINK);
+
+    m_adjust_bpm = manage(new Adjustment(m_mainperf->get_bpm(), 20, 500, 1));
+    m_spinbutton_bpm = manage( new SpinButton( *m_adjust_bpm ));
+    m_spinbutton_bpm->set_editable( false );
+    m_adjust_bpm->signal_value_changed().connect(
+            mem_fun(*this, &mainwnd::adj_callback_bpm));
+    add_tooltip( m_spinbutton_bpm, "Adjust beats per minute (BPM) value");
+    Label* bpmlabel = manage(new Label("_bpm", true));
+    bpmlabel->set_mnemonic_widget(*m_spinbutton_bpm);
+    bpmhbox->pack_start(*bpmlabel, Gtk::PACK_SHRINK);
+    bpmhbox->pack_start(*m_spinbutton_bpm, Gtk::PACK_SHRINK);
+
+    /* screen set name edit line */
+    HBox *notebox = manage(new HBox(false, 4));
+    bottomhbox->pack_start(*notebox, Gtk::PACK_EXPAND_WIDGET);
+
+    m_entry_notes = manage( new Entry());
+    m_entry_notes->signal_changed().connect(
+            mem_fun(*this, &mainwnd::edit_callback_notepad));
+    m_entry_notes->set_text(*m_mainperf->get_screen_set_notepad(
+                m_mainperf->get_screenset()));
+    add_tooltip( m_entry_notes, "Enter screen set name" );
+    Label* notelabel = manage(new Label("_Name", true));
+    notelabel->set_mnemonic_widget(*m_entry_notes);
+    notebox->pack_start(*notelabel, Gtk::PACK_SHRINK);
+    notebox->pack_start(*m_entry_notes, Gtk::PACK_EXPAND_WIDGET);
+
+    /* sequence set spin button */
+    HBox *sethbox = manage(new HBox(false, 4));
+    bottomhbox->pack_start(*sethbox, Gtk::PACK_SHRINK);
+
+    m_adjust_ss = manage( new Adjustment( 0, 0, c_max_sets - 1, 1 ));
+    m_spinbutton_ss = manage( new SpinButton( *m_adjust_ss ));
+    m_spinbutton_ss->set_editable( false );
+    m_spinbutton_ss->set_wrap( true );
+    m_adjust_ss->signal_value_changed().connect(
+            mem_fun(*this, &mainwnd::adj_callback_ss ));
+    add_tooltip( m_spinbutton_ss, "Select screen set" );
+    Label* setlabel = manage(new Label("_Set", true));
+    setlabel->set_mnemonic_widget(*m_spinbutton_ss);
+    sethbox->pack_start(*setlabel, Gtk::PACK_SHRINK);
+    sethbox->pack_start(*m_spinbutton_ss, Gtk::PACK_SHRINK);
 
     /* song edit button */
     m_button_perfedit = manage( new Button( ));
@@ -116,63 +220,28 @@ mainwnd::mainwnd(perform *a_p)
                     Gdk::Pixbuf::create_from_xpm_data( perfedit_xpm  ))));
     m_button_perfedit->signal_clicked().connect(
             mem_fun( *this, &mainwnd::open_performance_edit ));
-    m_button_perfedit->set_tooltip_text("Show or hide song editor window");
-    hbox->pack_end(*m_button_perfedit, false, false, 4);
-
-    /* bpm spin button */
-    m_adjust_bpm = manage(new Adjustment(m_mainperf->get_bpm(), 20, 500, 1));
-    m_spinbutton_bpm = manage( new SpinButton( *m_adjust_bpm ));
-    m_spinbutton_bpm->set_editable( false );
-    m_adjust_bpm->signal_value_changed().connect(
-            mem_fun(*this, &mainwnd::adj_callback_bpm ));
-    m_spinbutton_bpm->set_tooltip_text("Adjust beats per minute (BPM) value");
-    hbox->pack_start(*(manage( new Label( "  bpm " ))), false, false, 4);
-    hbox->pack_start(*m_spinbutton_bpm, false, false );
-  
-    /* sequence set spin button */
-    m_adjust_ss = manage( new Adjustment( 0, 0, c_max_sets - 1, 1 ));
-    m_spinbutton_ss = manage( new SpinButton( *m_adjust_ss ));
-    m_spinbutton_ss->set_editable( false );
-    m_spinbutton_ss->set_wrap( true );
-    m_adjust_ss->signal_value_changed().connect(
-            mem_fun(*this, &mainwnd::adj_callback_ss ));
-    m_spinbutton_ss->set_tooltip_text("Select sreen set");
-    hbox->pack_end(*m_spinbutton_ss, false, false );
-    hbox->pack_end(*(manage( new Label( "  set " ))), false, false, 4);
- 
-    /* screen set name edit line */
-    m_entry_notes = manage( new Entry());
-    m_entry_notes->signal_changed().connect(
-            mem_fun(*this, &mainwnd::edit_callback_notepad));
-    m_entry_notes->set_text(*m_mainperf->get_screen_set_notepad(
-                m_mainperf->get_screenset())); 
-    m_entry_notes->set_tooltip_text("Enter screen set name");
-    hbox->pack_start( *m_entry_notes, true, true );
+    add_tooltip( m_button_perfedit, "Show or hide song editor window" );
+    bottomhbox->pack_end(*m_button_perfedit, Gtk::PACK_SHRINK);
 
 
-    /* top line items */
-    HBox *hbox2 = manage( new HBox( false, 0 ) );
-    hbox2->pack_start(*manage(new Image(
-                    Gdk::Pixbuf::create_from_xpm_data(seq24_xpm))),
-            false, false);
-    hbox2->pack_end( *m_main_time, false, false );
+    /* vertical layout container for window content*/
+    VBox *contentvbox = new VBox();
+    contentvbox->set_spacing(10);
+    contentvbox->set_border_width(10);
+    contentvbox->pack_start(*tophbox, Gtk::PACK_SHRINK);
+    contentvbox->pack_start(*m_main_wid, Gtk::PACK_SHRINK);
+    contentvbox->pack_start(*bottomhbox, Gtk::PACK_SHRINK);
 
-    /* set up a vbox, put the menu in it, and add it */
-    VBox *vbox = new VBox();
-    vbox->set_border_width( 10 );
-    vbox->pack_start(*hbox2, false, false );
-    vbox->pack_start(*m_main_wid, true, true, 10 );
-    vbox->pack_start(*hbox, false, false ); 
- 
 
-    VBox *ovbox = new VBox();
- 
-    ovbox->pack_start(*m_menubar, false, false );
-    ovbox->pack_start( *vbox );
+    /*main container for menu and window content */
+    VBox *mainvbox = new VBox();
 
-    /* add box */
-    this->add (*ovbox);
-  
+    mainvbox->pack_start(*m_menubar, false, false );
+    mainvbox->pack_start( *contentvbox );
+
+    /* add main layout box */
+    this->add (*mainvbox);
+
     /* show everything */
     show_all();
 
@@ -180,20 +249,26 @@ mainwnd::mainwnd(perform *a_p)
 
     m_timeout_connect = Glib::signal_timeout().connect(
             mem_fun(*this, &mainwnd::timer_callback), 25);
-    
-    m_modified = false;
+
 
     m_perf_edit = new perfedit( m_mainperf );
-    m_options = NULL;
+
+    m_sigpipe[0] = -1;
+    m_sigpipe[1] = -1;
+    install_signal_handlers();
 }
 
- 
+
 mainwnd::~mainwnd()
 {
-    if ( m_perf_edit != NULL )
-        delete m_perf_edit;
-    if ( m_options != NULL )
-        delete m_options;
+    delete m_perf_edit;
+    delete m_options;
+
+    if (m_sigpipe[0] != -1)
+        close(m_sigpipe[0]);
+
+    if (m_sigpipe[1] != -1)
+        close(m_sigpipe[1]);
 }
 
 
@@ -203,7 +278,7 @@ bool
 mainwnd::timer_callback(  )
 {
     long ticks = m_mainperf->get_tick();
-	
+
     m_main_time->idle_progress( ticks );
     m_main_wid->update_markers( ticks );
 
@@ -213,17 +288,17 @@ mainwnd::timer_callback(  )
 
     if ( m_adjust_ss->get_value() !=  m_mainperf->get_screenset() )
     {
-        m_main_wid->set_screenset(m_mainperf->get_screenset());  
-        m_adjust_ss->set_value( m_mainperf->get_screenset());	
+        m_main_wid->set_screenset(m_mainperf->get_screenset());
+        m_adjust_ss->set_value( m_mainperf->get_screenset());
         m_entry_notes->set_text(*m_mainperf->get_screen_set_notepad(
-                    m_mainperf->get_screenset())); 
+                    m_mainperf->get_screenset()));
     }
 
     return true;
 }
 
 
-void 
+void
 mainwnd::open_performance_edit( void )
 {
     if (m_perf_edit->is_visible())
@@ -236,27 +311,26 @@ mainwnd::open_performance_edit( void )
 }
 
 
-void 
+void
 mainwnd::options_dialog( void )
 {
-    if ( m_options != NULL )
-        delete m_options;
-    m_options = new options( *this,  m_mainperf ); 
-    m_options->show_all(); 
+    delete m_options;
+    m_options = new options( *this,  m_mainperf );
+    m_options->show_all();
 }
 
 
-void 
+void
 mainwnd::start_playing( void )
 {
-    m_mainperf->position_jack( false );  
+    m_mainperf->position_jack( false );
     m_mainperf->start( false );
     m_mainperf->start_jack( );
     is_pattern_playing = true;
 }
 
 
-void 
+void
 mainwnd::stop_playing( void )
 {
     m_mainperf->stop_jack();
@@ -264,6 +338,28 @@ mainwnd::stop_playing( void )
     m_main_wid->update_sequences_on_window();
     is_pattern_playing = false;
 }
+
+void
+mainwnd::on_grouplearnchange(bool state)
+{
+    /* respond to learn mode change from m_mainperf */
+    m_button_learn->set_image(*manage(new Image(
+        Gdk::Pixbuf::create_from_xpm_data( state ? learn2_xpm : learn_xpm))));
+}
+
+void
+mainwnd::learn_toggle()
+{
+    if (m_mainperf->is_group_learning())
+    {
+        m_mainperf->unset_mode_group_learn();
+    }
+    else
+    {
+        m_mainperf->set_mode_group_learn();
+    }
+}
+
 
 
 /* callback function */
@@ -318,12 +414,12 @@ void mainwnd::file_save_as()
 
     dialog.set_current_folder(last_used_dir);
     int result = dialog.run();
-    
+
     switch (result) {
         case Gtk::RESPONSE_OK:
         {
             bool result = false;
-            
+
             std::string fname = dialog.get_filename();
             Gtk::FileFilter* current_filter = dialog.get_filter();
 
@@ -339,9 +435,10 @@ void mainwnd::file_save_as()
             }
 
             if (Glib::file_test(fname, Glib::FILE_TEST_EXISTS)) {
-                Gtk::MessageDialog warning(*this, false,
+                Gtk::MessageDialog warning(*this,
                         "File already exists!\n"
                         "Do you want to overwrite it?",
+                        false,
                         Gtk::MESSAGE_WARNING, Gtk::BUTTONS_YES_NO, true);
                 result = warning.run();
 
@@ -360,7 +457,7 @@ void mainwnd::file_save_as()
 }
 
 
-void mainwnd::open_file(const std::string& fn)
+void mainwnd::open_file(const Glib::ustring& fn)
 {
     bool result;
 
@@ -384,7 +481,7 @@ void mainwnd::open_file(const std::string& fn)
 
     m_main_wid->reset();
     m_entry_notes->set_text(*m_mainperf->get_screen_set_notepad(
-                m_mainperf->get_screenset())); 
+                m_mainperf->get_screenset()));
     m_adjust_bpm->set_value( m_mainperf->get_bpm());
 }
 
@@ -420,7 +517,7 @@ void mainwnd::choose_file()
     dialog.set_current_folder(last_used_dir);
 
     int result = dialog.run();
-    
+
     switch(result) {
         case(Gtk::RESPONSE_OK):
             open_file(dialog.get_filename());
@@ -466,8 +563,12 @@ int mainwnd::query_save_changes()
 
     Gtk::MessageDialog dialog(*this, query_str, false,
             Gtk::MESSAGE_QUESTION,
-            Gtk::BUTTONS_YES_NO, true); 
-    
+            Gtk::BUTTONS_NONE, true);
+
+    dialog.add_button(Gtk::Stock::YES, Gtk::RESPONSE_YES);
+    dialog.add_button(Gtk::Stock::NO, Gtk::RESPONSE_NO);
+    dialog.add_button(Gtk::Stock::CANCEL, Gtk::RESPONSE_CANCEL);
+
     return dialog.run();
 }
 
@@ -500,7 +601,8 @@ bool mainwnd::is_save()
 
 /* convert string to lower case letters */
 void
-mainwnd::toLower(basic_string<char>& s) {
+mainwnd::toLower(basic_string<char>& s)
+{
     for (basic_string<char>::iterator p = s.begin();
             p != s.end(); p++) {
         *p = tolower(*p);
@@ -508,7 +610,7 @@ mainwnd::toLower(basic_string<char>& s) {
 }
 
 
-void 
+void
 mainwnd::file_import_dialog( void )
 {
     Gtk::FileChooserDialog dialog("Import MIDI file",
@@ -528,7 +630,7 @@ mainwnd::file_import_dialog( void )
 
     dialog.set_current_folder(last_used_dir);
 
-    HButtonBox *btnbox = dialog.get_action_area(); 
+    ButtonBox *btnbox = dialog.get_action_area();
     HBox hbox( false, 2 );
 
     m_adjust_load_offset = manage( new Adjustment( 0, -(c_max_sets - 1),
@@ -539,7 +641,7 @@ mainwnd::file_import_dialog( void )
     hbox.pack_end(*m_spinbutton_load_offset, false, false );
     hbox.pack_end(*(manage( new Label("Screen Set Offset"))), false, false, 4);
 
-    btnbox->pack_start(hbox, false, false );  
+    btnbox->pack_start(hbox, false, false );
 
     dialog.add_button(Gtk::Stock::CANCEL, Gtk::RESPONSE_CANCEL);
     dialog.add_button(Gtk::Stock::OPEN, Gtk::RESPONSE_OK);
@@ -558,7 +660,7 @@ mainwnd::file_import_dialog( void )
                f.parse( m_mainperf, (int) m_adjust_load_offset->get_value() );
            }
            catch(...){
-               Gtk::MessageDialog errdialog(*this, 
+               Gtk::MessageDialog errdialog(*this,
                        "Error reading file.", false,
                        Gtk::MESSAGE_ERROR, Gtk::BUTTONS_OK, true);
                 errdialog.run();
@@ -567,10 +669,10 @@ mainwnd::file_import_dialog( void )
            global_filename = std::string(dialog.get_filename());
            update_window_title();
            m_modified = true;
-           
+
            m_main_wid->reset();
            m_entry_notes->set_text(*m_mainperf->get_screen_set_notepad(
-                       m_mainperf->get_screenset() )); 
+                       m_mainperf->get_screenset() ));
            m_adjust_bpm->set_value( m_mainperf->get_bpm() );
 
            break;
@@ -607,19 +709,18 @@ mainwnd::on_delete_event(GdkEventAny *a_e)
 }
 
 
-void 
+void
 mainwnd::about_dialog( void )
 {
     Gtk::AboutDialog dialog;
     dialog.set_transient_for(*this);
     dialog.set_name(PACKAGE_NAME);
-    dialog.set_version(PACKAGE_VERSION);
-    dialog.set_comments("Interactive MIDI Sequencer");
+    dialog.set_version(VERSION);
+    dialog.set_comments("Interactive MIDI Sequencer\n");
 
     dialog.set_copyright(
             "(C) 2002 - 2006 Rob C. Buse\n"
-            "(C) 2008 Seq24team");
-    
+            "(C) 2008 - 2010 Seq24team");
     dialog.set_website(
             "http://www.filter24.org/seq24\n"
             "http://edge.launchpad.net/seq24");
@@ -632,6 +733,9 @@ mainwnd::about_dialog( void )
     list_authors.push_back("Peter Leigh <pete.leigh@gmail.com>");
     list_authors.push_back("Anthony Green <green@redhat.com>");
     list_authors.push_back("Daniel Ellis <mail@danellis.co.uk>");
+    list_authors.push_back("Sebastien Alaiwan <sebastien.alaiwan@gmail.com>");
+    list_authors.push_back("Kevin Meinert <kevin@subatomicglue.com>");
+    list_authors.push_back("Andrea delle Canne <andreadellecanne@gmail.com>");
     dialog.set_authors(list_authors);
 
     std::list<Glib::ustring> list_documenters;
@@ -639,14 +743,14 @@ mainwnd::about_dialog( void )
     dialog.set_documenters(list_documenters);
 
     dialog.show_all_children();
-    dialog.run(); 
+    dialog.run();
 }
 
 
-void 
+void
 mainwnd::adj_callback_ss( )
 {
-    m_mainperf->set_screenset( (int) m_adjust_ss->get_value()); 
+    m_mainperf->set_screenset( (int) m_adjust_ss->get_value());
     m_main_wid->set_screenset( m_mainperf->get_screenset());
     m_entry_notes->set_text(*m_mainperf->get_screen_set_notepad(
                 m_mainperf->get_screenset()));
@@ -654,10 +758,10 @@ mainwnd::adj_callback_ss( )
 }
 
 
-void 
+void
 mainwnd::adj_callback_bpm( )
 {
-    m_mainperf->set_bpm( (int) m_adjust_bpm->get_value()); 
+    m_mainperf->set_bpm( (int) m_adjust_bpm->get_value());
     m_modified = true;
 }
 
@@ -675,6 +779,10 @@ mainwnd::on_key_release_event(GdkEventKey* a_ev)
             a_ev->keyval == m_mainperf->m_key_snapshot_2 )
         m_mainperf->unset_sequence_control_status( c_status_snapshot );
 
+    if ( a_ev->keyval == m_mainperf->m_key_group_learn ){
+        m_mainperf->unset_mode_group_learn();
+    }
+
     return false;
 }
 
@@ -683,8 +791,8 @@ void
 mainwnd::edit_callback_notepad( )
 {
     string text = m_entry_notes->get_text();
-    m_mainperf->set_screen_set_notepad( m_mainperf->get_screenset(), 
-				        &text ); 
+    m_mainperf->set_screen_set_notepad( m_mainperf->get_screenset(),
+				        &text );
     m_modified = true;
 }
 
@@ -692,89 +800,159 @@ mainwnd::edit_callback_notepad( )
 bool
 mainwnd::on_key_press_event(GdkEventKey* a_ev)
 {
+    Gtk::Window::on_key_press_event(a_ev);
+
     // control and modifier key combinations matching
-    // menu items have first priority
-    if (Gtk::Window::on_key_press_event(a_ev))
-        return true;
+    if ( a_ev->type == GDK_KEY_PRESS ){
 
-    else if ( m_entry_notes->has_focus()) {
-        m_entry_notes->event( (GdkEvent*) a_ev );
-        return false;
-    }
-    else {
-        if ( a_ev->type == GDK_KEY_PRESS ){
+        if ( global_print_keys ){
+            printf( "key_press[%d]\n", a_ev->keyval );
+            fflush( stdout );
+        }
 
-            if ( global_print_keys ){
-                printf( "key_press[%d]\n", a_ev->keyval ); 
-            }
-            
-            if ( a_ev->keyval == m_mainperf->m_key_bpm_dn ){
-                m_mainperf->set_bpm( m_mainperf->get_bpm() - 1 );  
-                m_adjust_bpm->set_value(  m_mainperf->get_bpm() );
-            }
-            
-            if ( a_ev->keyval ==  m_mainperf->m_key_bpm_up ){
-                m_mainperf->set_bpm( m_mainperf->get_bpm() + 1 );   
-                m_adjust_bpm->set_value(  m_mainperf->get_bpm() );
-            }
-            
-            if ( a_ev->keyval == m_mainperf->m_key_replace )
+        if ( a_ev->keyval == m_mainperf->m_key_bpm_dn ){
+            m_mainperf->set_bpm( m_mainperf->get_bpm() - 1 );
+            m_adjust_bpm->set_value(  m_mainperf->get_bpm() );
+        }
+
+        if ( a_ev->keyval ==  m_mainperf->m_key_bpm_up ){
+            m_mainperf->set_bpm( m_mainperf->get_bpm() + 1 );
+            m_adjust_bpm->set_value(  m_mainperf->get_bpm() );
+        }
+
+        if ( a_ev->keyval == m_mainperf->m_key_replace )
+        {
+            m_mainperf->set_sequence_control_status( c_status_replace );
+        }
+
+        if ((a_ev->keyval ==  m_mainperf->m_key_queue )
+                || (a_ev->keyval == m_mainperf->m_key_keep_queue ))
+        {
+            m_mainperf->set_sequence_control_status( c_status_queue );
+        }
+
+        if ( a_ev->keyval == m_mainperf->m_key_snapshot_1 ||
+                a_ev->keyval == m_mainperf->m_key_snapshot_2 )
+        {
+            m_mainperf->set_sequence_control_status( c_status_snapshot );
+        }
+
+        if ( a_ev->keyval == m_mainperf->m_key_screenset_dn ){
+
+            m_mainperf->set_screenset(  m_mainperf->get_screenset() - 1 );
+            m_main_wid->set_screenset(  m_mainperf->get_screenset() );
+            m_adjust_ss->set_value( m_mainperf->get_screenset()  );
+            m_entry_notes->set_text(*m_mainperf->get_screen_set_notepad(
+                        m_mainperf->get_screenset()));
+        }
+
+        if ( a_ev->keyval == m_mainperf->m_key_screenset_up ){
+
+            m_mainperf->set_screenset(  m_mainperf->get_screenset() + 1 );
+            m_main_wid->set_screenset(  m_mainperf->get_screenset() );
+            m_adjust_ss->set_value( m_mainperf->get_screenset()  );
+            m_entry_notes->set_text(*m_mainperf->get_screen_set_notepad(
+                        m_mainperf->get_screenset()));
+        }
+
+        if ( a_ev->keyval == m_mainperf->m_key_set_playing_screenset ){
+            m_mainperf->set_playing_screenset();
+        }
+
+        if ( a_ev->keyval == m_mainperf->m_key_group_on ){
+            m_mainperf->set_mode_group_mute();
+        }
+
+        if ( a_ev->keyval == m_mainperf->m_key_group_off ){
+            m_mainperf->unset_mode_group_mute();
+        }
+
+        if ( a_ev->keyval == m_mainperf->m_key_group_learn ){
+            m_mainperf->set_mode_group_learn();
+        }
+
+        // activate mute group key
+        if (m_mainperf->get_key_groups()->count( a_ev->keyval ) != 0 )
+        {
+            m_mainperf->select_and_mute_group(
+                    m_mainperf->lookup_keygroup_group(a_ev->keyval));
+        }
+
+        // mute group learn
+        if (m_mainperf->is_learn_mode() &&
+                a_ev->keyval != m_mainperf->m_key_group_learn)
+        {
+            if( m_mainperf->get_key_groups()->count( a_ev->keyval ) != 0 )
             {
-                m_mainperf->set_sequence_control_status( c_status_replace );
+                std::ostringstream os;
+                os << "Key \""
+                    << gdk_keyval_name(a_ev->keyval)
+                    << "\" (code = "
+                    << a_ev->keyval
+                    << ") successfully mapped.";
+
+                Gtk::MessageDialog dialog(*this,
+                        "MIDI mute group learn success", false,
+                        Gtk::MESSAGE_INFO, Gtk::BUTTONS_OK, true);
+                dialog.set_secondary_text(os.str(), false);
+                dialog.run();
+
+                // we miss the keyup msg for learn, force set it off
+                m_mainperf->unset_mode_group_learn();
             }
-            
-            if (a_ev->keyval ==  m_mainperf->m_key_queue )
+            else
             {
-                m_mainperf->set_sequence_control_status( c_status_queue );
-            }
-            
-            if ( a_ev->keyval == m_mainperf->m_key_snapshot_1 ||
-                 a_ev->keyval == m_mainperf->m_key_snapshot_2 )
-            {
-                m_mainperf->set_sequence_control_status( c_status_snapshot );
-            }
-            
-            if ( a_ev->keyval == m_mainperf->m_key_screenset_dn ){
+                std::ostringstream os;
+                os << "Key \""
+                    << gdk_keyval_name(a_ev->keyval)
+                    << "\" (code = "
+                    << a_ev->keyval
+                    << ") is not one of the configured mute-group keys.\n"
+                    << "To change this see File/Options menu or .seq24rc";
 
-                m_mainperf->set_screenset(  m_mainperf->get_screenset() - 1 );  
-                m_main_wid->set_screenset(  m_mainperf->get_screenset() );  
-                m_adjust_ss->set_value( m_mainperf->get_screenset()  );	
-                m_entry_notes->set_text( * m_mainperf->get_screen_set_notepad(m_mainperf->get_screenset()  )); 
-            }
-            
-            if ( a_ev->keyval == m_mainperf->m_key_screenset_up ){
+                Gtk::MessageDialog dialog(*this,
+                        "MIDI mute group learn failed", false,
+                        Gtk::MESSAGE_ERROR, Gtk::BUTTONS_OK, true);
 
-                m_mainperf->set_screenset(  m_mainperf->get_screenset() + 1 );  
-                m_main_wid->set_screenset(  m_mainperf->get_screenset() );  
-                m_adjust_ss->set_value( m_mainperf->get_screenset()  );	
-                m_entry_notes->set_text( * m_mainperf->get_screen_set_notepad(m_mainperf->get_screenset()  )); 
-            }
-            
-            if ( a_ev->keyval == m_mainperf->m_key_start )
-            {
-                if (is_pattern_playing)
-                    stop_playing();
-                else
-                    start_playing();
-            }
-
-
-            if( m_mainperf->get_key_events()->count( a_ev->keyval) != 0 ){
-                
-                sequence_key(  (*m_mainperf->get_key_events())[a_ev->keyval] );
+                dialog.set_secondary_text(os.str(), false);
+                dialog.run();
+                // we miss the keyup msg for learn, force set it
+                m_mainperf->unset_mode_group_learn();
             }
         }
+
+        // the start/end key may be the same key (i.e. SPACE)
+        // allow toggling when the same key is mapped to both
+        // triggers (i.e. SPACEBAR)
+        bool dont_toggle = m_mainperf->m_key_start
+            != m_mainperf->m_key_stop;
+
+        if ( a_ev->keyval == m_mainperf->m_key_start
+                && (dont_toggle || !is_pattern_playing))
+        {
+            start_playing();
+        }
+        else if ( a_ev->keyval == m_mainperf->m_key_stop
+                && (dont_toggle || is_pattern_playing))
+        {
+            stop_playing();
+        }
+
+        /* toggle sequence mute/unmute using keyboard keys... */
+        if (m_mainperf->get_key_events()->count( a_ev->keyval) != 0)
+        {
+            sequence_key(m_mainperf->lookup_keyevent_seq( a_ev->keyval));
+        }
     }
-    
     return false;
 }
 
 
-void 
+void
 mainwnd::sequence_key( int a_seq )
 {
     int offset = m_mainperf->get_screenset() * c_mainwnd_rows * c_mainwnd_cols;
-	
+
     if ( m_mainperf->is_active( a_seq + offset ) ){
 		m_mainperf->sequence_playing_toggle( a_seq + offset );
     }
@@ -794,12 +972,100 @@ mainwnd::update_window_title()
             + string( " - [" )
             + Glib::filename_to_utf8(global_filename)
             + string( "]" );
-    
+
     set_title ( title.c_str());
 }
 
 
-bool mainwnd::is_modified()
+bool
+mainwnd::is_modified()
 {
     return m_modified;
+}
+
+
+int mainwnd::m_sigpipe[2];
+
+
+/* Handler for system signals (SIGUSR1, SIGINT...)
+ * Write a message to the pipe and leave as soon as possible
+ */
+void
+mainwnd::handle_signal(int sig)
+{
+    if (write(m_sigpipe[1], &sig, sizeof(sig)) == -1)
+    {
+        printf("write() failed: %s\n", std::strerror(errno));
+    }
+}
+
+
+bool
+mainwnd::install_signal_handlers()
+{
+    /*install pipe to forward received system signals*/
+    if (pipe(m_sigpipe) < 0)
+    {
+        printf("pipe() failed: %s\n", std::strerror(errno));
+        return false;
+    }
+
+    /*install notifier to handle pipe messages*/
+    Glib::signal_io().connect(sigc::mem_fun(*this, &mainwnd::signal_action),
+            m_sigpipe[0], Glib::IO_IN);
+
+    /*install signal handlers*/
+    struct sigaction action;
+    memset(&action, 0, sizeof(action));
+    action.sa_handler = handle_signal;
+
+    if (sigaction(SIGUSR1, &action, NULL) == -1)
+    {
+        printf("sigaction() failed: %s\n", std::strerror(errno));
+        return false;
+    }
+
+    if (sigaction(SIGINT, &action, NULL) == -1)
+    {
+        printf("sigaction() failed: %s\n", std::strerror(errno));
+        return false;
+    }
+
+    return true;
+}
+
+
+bool
+mainwnd::signal_action(Glib::IOCondition condition)
+{
+    int message;
+
+    if ((condition & Glib::IO_IN) == 0)
+    {
+        printf("Error: unexpected IO condition\n");
+        return false;
+    }
+
+
+    if (read(m_sigpipe[0], &message, sizeof(message)) == -1)
+    {
+        printf("read() failed: %s\n", std::strerror(errno));
+        return false;
+    }
+
+    switch (message)
+    {
+        case SIGUSR1:
+            save_file();
+            break;
+
+        case SIGINT:
+            file_exit();
+            break;
+
+        default:
+            printf("Unexpected signal received: %d\n", message);
+            break;
+    }
+    return true;
 }

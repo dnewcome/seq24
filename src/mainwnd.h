@@ -23,7 +23,6 @@
 #include "perform.h"
 #include "sequence.h"
 #include "event.h"
-#include "options.h"
 #include "maintime.h"
 #include "perfedit.h"
 #include "options.h"
@@ -47,19 +46,25 @@ using namespace Gtk;
 using namespace Menu_Helpers;
 
 
-class mainwnd : public Gtk::Window
+class mainwnd : public Gtk::Window, public performcallback
 {
-   
+    /* notification handler for learn mode toggle */
+    virtual void on_grouplearnchange(bool state);
+
  private:
 
+    perform  *m_mainperf;
     bool      m_modified;
-    
+    static int m_sigpipe[2];
+
+#if GTK_MINOR_VERSION < 12
+    Tooltips *m_tooltips;
+#endif
     MenuBar  *m_menubar;
     Menu     *m_menu_file;
     Menu     *m_menu_view;
     Menu     *m_menu_help;
 
-    perform  *m_mainperf;
 
     mainwid  *m_main_wid;
     maintime *m_main_time;
@@ -68,7 +73,9 @@ class mainwnd : public Gtk::Window
     options *m_options;
 
     Gdk::Cursor   m_main_cursor;
-    
+
+    Button      *m_button_learn;
+
     Button      *m_button_stop;
     Button      *m_button_play;
     Button      *m_button_perfedit;
@@ -97,6 +104,7 @@ class mainwnd : public Gtk::Window
 
     void start_playing();
     void stop_playing();
+    void learn_toggle();
     void open_performance_edit( );
     void sequence_key( int a_seq );
     void update_window_title();
@@ -108,17 +116,20 @@ class mainwnd : public Gtk::Window
     void file_save_as();
     void file_exit();
     void new_file();
-    void open_file(const std::string&);
     bool save_file();
     void choose_file();
     int query_save_changes();
     bool is_save();
+    static void handle_signal(int sig);
+    bool install_signal_handlers();
+    bool signal_action(Glib::IOCondition condition);
 
  public:
 
     mainwnd(perform *a_p);
     ~mainwnd();
 
+    void open_file(const Glib::ustring&);
     bool on_delete_event(GdkEventAny *a_e);
     bool on_key_press_event(GdkEventKey* a_ev);
     bool on_key_release_event(GdkEventKey* a_ev);

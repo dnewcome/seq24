@@ -45,30 +45,60 @@
 
 using namespace Gtk;
 
+// interaction methods
+class seqevent;
+struct FruitySeqEventInput
+{
+    FruitySeqEventInput() : m_justselected_one(false),
+                            m_is_drag_pasting_start(false),
+                            m_is_drag_pasting(false)
+    {}
+    bool m_justselected_one;
+    bool m_is_drag_pasting_start;
+    bool m_is_drag_pasting;
+    bool on_button_press_event(GdkEventButton* a_ev, seqevent& ths);
+    bool on_button_release_event(GdkEventButton* a_ev, seqevent& ths);
+    bool on_motion_notify_event(GdkEventMotion* a_ev, seqevent& ths);
+    void updateMousePtr(seqevent& ths);
+};
+struct Seq24SeqEventInput
+{
+    Seq24SeqEventInput() : m_adding( false ) {}
+    bool on_button_press_event(GdkEventButton* a_ev, seqevent& ths);
+    bool on_button_release_event(GdkEventButton* a_ev, seqevent& ths);
+    bool on_motion_notify_event(GdkEventMotion* a_ev, seqevent& ths);
+    void set_adding( bool a_adding, seqevent& ths );
+    bool m_adding;
+};
+
+
 /* piano event */
 class seqevent : public Gtk::DrawingArea
 {
 
- private: 
+ private:
+    friend struct FruitySeqEventInput;
+    FruitySeqEventInput m_fruity_interaction;
+
+    friend struct Seq24SeqEventInput;
+    Seq24SeqEventInput m_seq24_interaction;
 
     Glib::RefPtr<Gdk::GC> m_gc;
     Glib::RefPtr<Gdk::Window> m_window;
     Gdk::Color m_black, m_white, m_grey, m_dk_grey, m_red;
 
     Glib::RefPtr<Gdk::Pixmap> m_pixmap;
- 
+
     GdkRectangle m_old;
     GdkRectangle m_selected;
 
-    Gtk::Adjustment   *m_hadjust;
+    Gtk::Adjustment   * const m_hadjust;
 
     int m_scroll_offset_ticks;
     int m_scroll_offset_x;
 
-   
-    
-    sequence     *m_seq;
-    seqdata      *m_seqdata_wid;
+    sequence     * const m_seq;
+    seqdata      * const m_seqdata_wid;
 
     /* one pixel == m_zoom ticks */
     int          m_zoom;
@@ -81,12 +111,11 @@ class seqevent : public Gtk::DrawingArea
     bool m_moving_init;
     bool m_moving;
     bool m_growing;
-    bool m_adding;
     bool m_painting;
     bool m_paste;
 
     /* where the dragging started */
-    int m_drop_x; 
+    int m_drop_x;
     int m_drop_y;
     int m_current_x;
     int m_current_y;
@@ -100,7 +129,7 @@ class seqevent : public Gtk::DrawingArea
     void on_realize();
     bool on_expose_event(GdkEventExpose* a_ev);
 
-    bool on_button_press_event(GdkEventButton* a_ev); 
+    bool on_button_press_event(GdkEventButton* a_ev);
     bool on_button_release_event(GdkEventButton* a_ev);
     bool on_motion_notify_event(GdkEventMotion* a_ev);
     bool on_key_press_event(GdkEventKey* a_p0);
@@ -121,7 +150,7 @@ class seqevent : public Gtk::DrawingArea
 
     void start_paste( void );
 
-    void on_size_allocate(Gtk::Allocation& );    
+    void on_size_allocate(Gtk::Allocation& );
     void change_horz( void );
 
     void force_draw( void );
@@ -140,20 +169,15 @@ class seqevent : public Gtk::DrawingArea
     void set_snap( int a_snap );
 
     void set_data_type( unsigned char a_status, unsigned char a_control  );
-   
+
     void update_sizes();
     void draw_background();
     void draw_events_on_pixmap();
     void draw_pixmap_on_window();
     void draw_selection_on_window();
     void update_pixmap();
-    
+
     int idle_redraw();
-
-    void set_adding( bool a_adding );
-
-
-  
 };
 
 #endif
