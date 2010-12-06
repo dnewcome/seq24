@@ -1,2 +1,3 @@
-version=2
-http://www.filter24.org/seq24/download.html seq24-(.*)\.tar\.gz
+version=3
+https://launchpad.net/seq24/+download \
+http://launchpad.net/seq24/trunk/.*/\+download/seq24-(.*)\.tar\.bz2
