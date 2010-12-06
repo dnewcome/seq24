@@ -1,3 +1,19 @@
+seq24 (0.9.2-1) experimental; urgency=low
+
+  * New upstream release (Closes: #602852).
+  * New maintainer (Closes: #547028), add myself to the uploaders list.
+  * Add debian/gbp.conf file.
+  * Update watch file, downloads are now available on Launchpad.
+  * debian/control:
+    - Properly bump JACK's build-dependencies to provide session support.
+    - Re-enable libasound2-dev on kfreebsd-*,hurd-i386 architectures since
+      it is provided by 'liboss-salsa-dev'.
+    - Bump Standards.
+    - Add Vcs-* tags.
+  * Update debian/copyright file.
+
+ -- Alessio Treglia <alessio@debian.org>  Mon, 06 Dec 2010 19:17:04 +0100
+
 seq24 (0.9.0-3) unstable; urgency=low
 
   * New maintainer (Closes: #547028), add myself to the Uploaders list.
