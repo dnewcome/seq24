@@ -19,6 +19,7 @@ Package: seq24
 Architecture: any
 Depends: ${shlibs:Depends},
  ${misc:Depends}
+Recommends: jackd
 Description: Real time MIDI sequencer
  Seq24 was created to provide a very simple interface for editing and 
  playing midi 'loops'. It is a very minimal sequencer that excludes the 
