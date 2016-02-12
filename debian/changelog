@@ -1,3 +1,19 @@
+seq24 (0.9.3-1) unstable; urgency=medium
+
+  * New upstream release (Closes: #805681)
+  * Fix dh sequence invocation as per DH V8
+  * Bump DH to 9
+  * Recommend jackd
+  * Remove debian/menu file
+  * Update copyright file as per copyright format 1.0
+  * Update Homepage field
+  * Fix watch file
+  * Update Vcs fields
+  * Run wrap-and-sort -a -s
+  * Bump Standards
+
+ -- Alessio Treglia <alessio@debian.org>  Fri, 12 Feb 2016 09:16:45 +0000
+
 seq24 (0.9.2-2) unstable; urgency=low
 
   * Upload to unstable.
