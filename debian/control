@@ -14,7 +14,7 @@ Build-Depends:
  libjack-dev | libjack-jackd2-dev
 Standards-Version: 3.9.7
 Homepage: https://launchpad.net/seq24
-Vcs-Git: git://anonscm.debian.org/pkg-multimedia/seq24.git
+Vcs-Git: https://anonscm.debian.org/git/pkg-multimedia/seq24.git
 Vcs-Browser: https://anonscm.debian.org/cgit/pkg-multimedia/seq24.git
 
 Package: seq24
