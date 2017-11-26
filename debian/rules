@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 # -*- mode: makefile; coding: utf-8 -*-
 
-LDFLAGS+=-Wl,--as-needed
+export DEB_LDFLAGS_MAINT_APPEND := -Wl,--as-needed
 
 %:
 	dh $@
