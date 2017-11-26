@@ -5,10 +5,7 @@ Maintainer: Debian Multimedia Maintainers <pkg-multimedia-maintainers@lists.alio
 Uploaders:
  Alessio Treglia <alessio@debian.org>
 Build-Depends:
- autoconf,
- automake,
- autotools-dev (>= 20100122.1~),
- debhelper (>= 9~),
+ debhelper (>= 10),
  libasound2-dev,
  libgtkmm-2.4-dev,
  libjack-dev | libjack-jackd2-dev
