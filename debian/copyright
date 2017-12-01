@@ -4,7 +4,9 @@ Upstream-Contact: Guido Scholz <guido-scholz@gmx.net>
 Source: https://launchpad.net/seq24/+download
 
 Files: *
-Copyright: No copyright holder
+Copyright:
+ 2002-2006 Rob C. Buse
+ 2008-2010 Seq24team
 License: GPL-2+
 
 Files: debian/*
