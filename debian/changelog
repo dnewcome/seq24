@@ -1,9 +1,23 @@
-seq24 (0.9.3-2) UNRELEASED; urgency=medium
+seq24 (0.9.3-2) unstable; urgency=medium
 
   * Team upload.
-  *
+  * Use debhelper compat 10 and dh-autoreconf.
+  * Install AUTHORS, SEQ24 and seq24usr.example files. (Closes: #732107)
+  * Use PNG application icon.
 
- -- James Cowgill <jcowgill@debian.org>  Sun, 26 Nov 2017 18:54:57 +0000
+  * debian/changelog:
+    - Remove trailing whitespace from debian/changelog.
+  * debian/copyright:
+    - Add missing copyright info
+  * debian/control:
+    - Bump standards version to 4.1.2.
+  * debian/patches:
+    - Add patch to fix FTBFS - error: reference to 'mutex' is ambiguous.
+      (Closes: #822394, LP: #1647614)
+  * debian/rules:
+    - Use DEB_LDFLAGS_MAINT_APPEND to adjust LDFLAGS.
+
+ -- James Cowgill <jcowgill@debian.org>  Fri, 01 Dec 2017 17:16:27 +0000
 
 seq24 (0.9.3-1) unstable; urgency=medium
 
