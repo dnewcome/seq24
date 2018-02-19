@@ -11,8 +11,8 @@ Build-Depends:
  libjack-dev | libjack-jackd2-dev
 Standards-Version: 4.1.2
 Homepage: https://launchpad.net/seq24
-Vcs-Git: https://anonscm.debian.org/git/pkg-multimedia/seq24.git
-Vcs-Browser: https://anonscm.debian.org/cgit/pkg-multimedia/seq24.git
+Vcs-Git: https://salsa.debian.org/multimedia-team/seq24.git
+Vcs-Browser: https://salsa.debian.org/multimedia-team/seq24
 
 Package: seq24
 Architecture: any
