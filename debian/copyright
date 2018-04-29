@@ -12,6 +12,7 @@ License: GPL-2+
 Files: debian/*
 Copyright:
  2018 Olivier Humbert <trebmuh@tuxfamily.org>
+ 2017 James Cowgill <jcowgill@debian.org>
  2010-2016 Alessio Treglia <alessio@debian.org>
 License: GPL-2+
 
