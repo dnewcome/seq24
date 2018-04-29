@@ -1,3 +1,10 @@
+seq24 (0.9.3-3) UNRELEASED; urgency=medium
+
+  * add a French translation for the menu item and comment.
+  * update d/copyright file.
+
+ -- Olivier Humbert <trebmuh@tuxfamily.org>  Sun, 26 Apr 2018 12:15:00 +0100
+
 seq24 (0.9.3-2) unstable; urgency=medium
 
   * Team upload.
