@@ -2,6 +2,7 @@
 Name=Seq24
 GenericName=
 Comment=MIDI Sequencer
+Comment[fr]=Séquenceur MIDI
 Icon=seq24
 
 Type=Application
