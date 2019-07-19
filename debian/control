@@ -5,7 +5,7 @@ Maintainer: Debian Multimedia Maintainers <debian-multimedia@lists.debian.org>
 Uploaders:
  Alessio Treglia <alessio@debian.org>
 Build-Depends:
- debhelper (>= 10),
+ debhelper-compat (= 10),
  libasound2-dev,
  libgtkmm-2.4-dev,
  libjack-dev | libjack-jackd2-dev
