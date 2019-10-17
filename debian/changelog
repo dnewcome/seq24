@@ -2,6 +2,7 @@ seq24 (0.9.3-3) UNRELEASED; urgency=medium
 
   * add a French translation for the menu item and comment.
   * update d/copyright file.
+  * d/changelog: remove empty lines.
 
  -- Olivier Humbert <trebmuh@tuxfamily.org>  Sun, 26 Apr 2018 12:15:00 +0100
 
@@ -245,4 +246,3 @@ seq24 (0.4.3-1) unstable; urgency=low
   * Initial Release (closes: #223807).
 
  -- Guenter Geiger (Debian/GNU) <geiger@debian.org>  Wed,  9 Jul 2003 17:51:02 +0200
-
