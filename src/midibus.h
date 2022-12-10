@@ -35,11 +35,11 @@ class midibus;
 #    include <alsa/seq_midi_event.h>
 #endif
 
+#include <mutex>
 #include <string>
 
 #include "event.h"
 #include "sequence.h"
-#include "mutex.h"
 #include "globals.h"
 
 const int c_midibus_output_size = 0x100000;
@@ -90,7 +90,7 @@ class midibus
 
 
     /* locking */
-    mutex m_mutex;
+    std::recursive_mutex m_mutex;
 
     /* mutex */
     void lock();
@@ -208,7 +208,7 @@ class mastermidibus
     sequence *m_seq;
 
     /* locking */
-    mutex m_mutex;
+    std::recursive_mutex m_mutex;
 
     /* mutex */
     void lock();

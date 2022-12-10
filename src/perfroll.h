@@ -39,8 +39,6 @@
 
 #include "globals.h"
 #include "perform.h"
-#include "mutex.h"
-
 
 using namespace Gtk;
 

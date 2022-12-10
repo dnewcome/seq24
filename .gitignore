@@ -1,1 +1,8 @@
 /.pc
+*.o
+Makefile
+config.h
+autom4te.cache
+config.log
+config.status
+src/seq24

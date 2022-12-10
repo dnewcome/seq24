@@ -26,11 +26,11 @@ class sequence;
 #include <string>
 #include <list>
 #include <stack>
+#include <mutex>
 
 #include "event.h"
 #include "midibus.h"
 #include "globals.h"
-#include "mutex.h"
 
 enum draw_type
 {
@@ -153,7 +153,7 @@ class sequence
     long m_rec_vol;
 
     /* locking */
-    mutex m_mutex;
+    std::recursive_mutex m_mutex;
 
     /* used to idenfity which events are ours in the out queue */
     //unsigned char m_tag;

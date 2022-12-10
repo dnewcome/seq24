@@ -102,6 +102,10 @@ mainwnd::mainwnd(perform *a_p):
     m_menu_view->items().push_back(MenuElem("_Song Editor...",
                 Gtk::AccelKey("<control>E"),
                 mem_fun(*this, &mainwnd::open_performance_edit)));
+    m_menu_view->items().push_back(MenuElem("_Song Editorr...",
+                Gtk::AccelKey("<control>E"),
+                mem_fun(*this, &mainwnd::open_performance_edit)));
+
 
     /* help menu items */
     m_menu_help->items().push_back(MenuElem("_About...",

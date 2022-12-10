@@ -32,6 +32,9 @@ class perform;
 #endif
 #include <pthread.h>
 
+#include <condition_variable>
+#include <mutex>
+
 
 /* if we have jack, include the jack headers */
 #ifdef JACK_SUPPORT
@@ -152,7 +155,8 @@ class perform
     int m_control_status;
     int m_screen_set;
 
-    condition_var m_condition_var;
+    std::condition_variable m_condition_var;
+    std::mutex m_mutex;
 
     // do not access these directly, use set/lookup below
     std::map<unsigned int,long> key_events;

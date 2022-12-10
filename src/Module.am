@@ -31,8 +31,6 @@ bin_PROGRAMS = %D%/seq24
   %D%/midibus_portmidi.h \
   %D%/midifile.cpp \
   %D%/midifile.h \
-  %D%/mutex.cpp \
-  %D%/mutex.h \
   %D%/options.cpp \
   %D%/options.h \
   %D%/optionsfile.cpp \

@@ -426,7 +426,7 @@ perform::~perform()
     m_outputing = false;
     m_running = false;
 
-    m_condition_var.signal();
+    m_condition_var.notify_one();
 
     if (m_out_thread_launched )
         pthread_join( m_out_thread, NULL );
@@ -1005,7 +1005,7 @@ void perform::stop()
 
 void perform::inner_start(bool a_state)
 {
-    m_condition_var.lock();
+    std::lock_guard<std::mutex> lock(m_mutex);
 
     if (!is_running()) {
 
@@ -1015,10 +1015,8 @@ void perform::inner_start(bool a_state)
             off_sequences();
 
         set_running(true);
-        m_condition_var.signal();
+        m_condition_var.notify_one();
     }
-
-    m_condition_var.unlock();
 }
 
 
@@ -1262,18 +1260,18 @@ void perform::output_func()
 
         //printf ("waiting for signal\n");
 
-        m_condition_var.lock();
+        std::unique_lock<std::mutex> lock(m_mutex);
 
         while (!m_running) {
 
-            m_condition_var.wait();
+            m_condition_var.wait(lock);
 
             /* if stopping, then kill thread */
             if (!m_outputing)
                 break;
         }
 
-        m_condition_var.unlock();
+        lock.unlock();
 
         //printf( "signaled [%d]\n", m_playback_mode );
 
